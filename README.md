@@ -6,7 +6,7 @@
 
 The complete project report can be accessed through the Google Drive link below:
 
-[📄 REPORT]([https://drive.google.com/xxxxx](https://drive.google.com/file/d/1H67X7qNdFu5MaYfPBCpyNHr_sHiq0Fw7/))
+[📄 REPORT](https://drive.google.com/file/d/1H67X7qNdFu5MaYfPBCpyNHr_sHiq0Fw7/)
 
 # Project Overview
 

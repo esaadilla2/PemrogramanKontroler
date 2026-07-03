@@ -1,4 +1,4 @@
-# Interrupt-Based Realtime Pipeline Pressure Anomaly Detection with Watchdog Recovery on ESP32-S3
+# nterrupt-Based Real-Time Pipeline Pressure Monitoring and Anomaly Detection Using ESP32-S3
 
 ---
 
@@ -15,12 +15,12 @@ This project implements a realtime embedded pressure monitoring and anomaly dete
 The system continuously performs:
 
 - realtime ADC sampling
-- pressure level monitoring
-- anomaly detection
-- leak simulation detection
-- watchdog monitoring
-- fault recovery handling
-- buzzer and LED alert activation
+- pressure monitoring
+- Pressure calculation
+- Pressure anomaly detection
+- Leak simulation using potentiometer
+- LED and buzzer alarm activation
+- UART serial monitoring
 
 The project is designed as an embedded realtime system simulation prototype for industrial instrumentation and control applications.
 
@@ -31,24 +31,25 @@ The project is designed as an embedded realtime system simulation prototype for 
 The objectives of this project are:
 
 - Implement realtime pressure monitoring on ESP32-S3
-- Simulate pipeline pressure anomaly detection
-- Implement software watchdog recovery mechanism
-- Develop embedded realtime task scheduling using Rust
-- Simulate industrial fault detection behavior
-
+- Implement pressure calculation based on ADC conversion
+- Implement real-time pressure anomaly detection
+- Develop interrupt-based embedded task scheduling using Rust
+- Simulate pipeline leak detection using a potentiometer
+  
 ---
 
 # Main Features
 
 - Realtime ADC sampling
-- Pressure normalization into percentage scale
-- Leak detection simulation
-- Software watchdog recovery
-- Realtime serial monitoring
+- ADC-to-voltage conversion
+- Voltage-to-pressure conversion
+- Pressure threshold-based anomaly detection
+- UART serial monitoring
 - LED warning indicator
 - Buzzer alarm system
+- Anomaly counter
 - Wokwi hardware simulation
-- Rust embedded-hal implementation
+- Rust esp-hal implementation
 
 ---
 
@@ -58,9 +59,8 @@ The system is divided into several realtime software tasks.
 
 | Task | Description | Interval |
 |---|---|---|
-| ADC Sampling Task | Reads analog pressure input | 100 ms |
+| ADC Sampling Task | Read ADC and calculate pressure | 100 ms |
 | Display Task | Displays monitoring data | 1000 ms |
-| Watchdog Monitoring Task | Detects sensor abnormal condition | 3000 ms |
 
 ---
 
@@ -136,105 +136,155 @@ The system uses periodic software scheduling to simulate realtime embedded task 
 ```text
 ADC Sampling
       ↓
-Pressure Normalization
+ADC to Voltage Conversion
       ↓
-Anomaly Detection
+Voltage to Pressure Conversion
       ↓
-LED/Buzzer Alert
+Pressure Threshold Detection
       ↓
-Watchdog Monitoring
+Anomaly Detection & Counter
       ↓
-Recovery Mechanism
+LED/Buzzer Alarm
+      ↓
+UART Monitoring
+
 ```
 
 ---
 
 # Pressure Simulation
 
-Pressure input is simulated using potentiometer ADC mapping.
+The potentiometer is used as an analog input to simulate the output voltage of a pressure sensor. The ESP32-S3 reads the analog voltage through its 12-bit ADC, producing a digital value in the range of 0–4095.
 
-ADC values are normalized into percentage scale using:
+The ADC value is first converted into an analog voltage using the following equation:
+
+\[
+V_{in} = \frac{ADC}{4095} \times V_{REF}
+\]
+
+where:
+
+- **ADC** = 12-bit ADC reading (0–4095)
+- **4095** = Maximum value of a 12-bit ADC
+- **VREF** = ADC reference voltage (3.3 V)
+
+After obtaining the input voltage, the pressure value is calculated using the transfer function of the MPX5010 pressure sensor:
+
+\[
+P=\frac{\left(\frac{V_{in}}{V_S}\right)-0.04}{0.09}
+\]
+
+where:
+
+- **P** = Calculated pressure (kg/cm²)
+- **Vin** = Voltage obtained from the ADC conversion
+- **VS** = Sensor supply voltage (5 V)
+
+The calculated pressure is then compared with a predefined threshold.
 
 ```rust
-pressure_percent =
-    (pressure_value as f32 / 4095.0) * 100.0;
+let vin =
+    (pressure_raw as f32 / 4095.0)
+    * VREF;
+
+pressure =
+    ((vin / VS) - 0.04)
+    / 0.09;
 ```
 
----
+If the pressure value falls below the predefined threshold, the system identifies the condition as a pressure anomaly (pipeline leak simulation), activates the LED and buzzer, and increments the anomaly counter.
 
-# ADC Mapping Table
-
-| ADC Value | Pressure Level |
-|---|---|
-| 0 | 0 % |
-| 1024 | 25 % |
-| 2047 | 50 % |
-| 3071 | 75 % |
-| 4095 | 100 % |
 
 ---
 
-# Realtime Sampling
+# Real-Time Sampling
 
-The system samples ADC input every:
+The system performs periodic ADC sampling every:
 
 ```text
 100 ms
 ```
 
-This means the system performs:
+This corresponds to:
 
 ```text
 10 ADC readings per second
 ```
 
+Periodic sampling ensures that pressure data are acquired consistently for real-time monitoring and anomaly detection.
+
 ---
 
 # Display Update
 
-Serial monitor output updates every:
+The monitoring results are transmitted to the serial monitor every:
 
 ```text
 1000 ms
 ```
 
-This avoids excessive terminal spam while maintaining realtime monitoring behavior.
+The displayed information includes:
+
+- Time
+- ADC Raw Value
+- Pressure (kg/cm²)
+- Pressure Threshold
+- Anomaly Counter
+- System Status
+- LED Status
+- Buzzer Status
+
+Updating the display once every second improves readability while maintaining real-time monitoring performance.
 
 ---
 
 # Pressure Anomaly Detection
 
-The system detects abnormal pressure drops using threshold comparison.
+Pressure anomaly detection is performed using a predefined pressure threshold.
 
 ```rust
-if pressure_value < 2000
+if pressure < PRESSURE_THRESHOLD
 ```
 
-If pressure falls below threshold:
+where
+
+```rust
+const PRESSURE_THRESHOLD: f32 = 5.0;
+```
+
+If the calculated pressure falls below the threshold:
 
 - LED turns ON
 - Buzzer turns ON
-- Status changes to ANOMALY
+- Status changes to **ANOMALY**
+- Anomaly Counter increases
 
-This simulates sudden pipeline pressure loss or leak condition.
+Otherwise:
+
+- LED turns OFF
+- Buzzer turns OFF
+- Status changes to **NORMAL**
+- Anomaly Counter resets to zero
+
+This simulates a sudden pressure drop that may indicate a pipeline leak.
 
 ---
 
-# Software Watchdog Recovery
+# Anomaly Counter
 
-The watchdog mechanism detects sensor abnormal conditions.
+The anomaly counter records the number of consecutive pressure readings below the predefined threshold.
 
 ```rust
-if pressure_value <= 300
+anomaly_counter += 1;
 ```
 
-If abnormal condition persists for several monitoring cycles:
+If the pressure returns to the normal operating range, the counter is automatically reset.
 
-- Recovery mode activates
-- Watchdog alert appears
-- Alarm system triggers
+```rust
+anomaly_counter = 0;
+```
 
-This simulates fault handling and embedded recovery behavior.
+The counter is used to indicate how long an abnormal pressure condition persists during system operation.
 
 ---
 
@@ -246,65 +296,61 @@ This simulates fault handling and embedded recovery behavior.
 
 ## Description
 
-Potentiometer is set to medium or high value.
+The potentiometer is adjusted so that the calculated pressure remains above the predefined threshold (5.00 kg/cm²).
 
 ## Expected Behavior
 
-- Stable pressure value
+- Pressure > 5.00 kg/cm²
 - Status = NORMAL
-- LED OFF
-- Buzzer OFF
-- Recovery = NORMAL
+- LED = OFF
+- Buzzer = OFF
+- Anomaly Counter = 0
 
 ## Example Data
 
-| Time (s) | Pressure (%) |
-|---|---|
-| 1 | 80 |
-| 2 | 79 |
-| 3 | 81 |
-| 4 | 78 |
-| 5 | 80 |
+| Time (s) | ADC Raw | Pressure (kg/cm²) | Status | LED | Buzzer | Anomaly Counter |
+|----------|--------:|------------------:|--------|-----|--------|----------------:|
+| 1 | 3767 | 6.30 | NORMAL | OFF | OFF | 0 |
+| 2 | 3787 | 6.34 | NORMAL | OFF | OFF | 0 |
+| 3 | 4095 | 6.89 | NORMAL | OFF | OFF | 0 |
+| 4 | 3928 | 6.59 | NORMAL | OFF | OFF | 0 |
+| 5 | 3993 | 6.71 | NORMAL | OFF | OFF | 0 |
+| 6 | 4095 | 6.89 | NORMAL | OFF | OFF | 0 |
+| 7 | 3727 | 6.23 | NORMAL | OFF | OFF | 0 |
+| 8 | 4095 | 6.89 | NORMAL | OFF | OFF | 0 |
+| 9 | 3752 | 6.27 | NORMAL | OFF | OFF | 0 |
+| 10 | 4095 | 6.89 | NORMAL | OFF | OFF | 0 |
 
 ---
 
-# 2. Leak Detection Simulation
+# 2. Pressure Anomaly (Leak Simulation)
 
 ## Description
 
-Potentiometer value is suddenly decreased.
+The potentiometer is adjusted to simulate a pressure drop below the predefined threshold (5.00 kg/cm²).
 
 ## Expected Behavior
 
-- Sudden pressure drop detected
+- Pressure < 5.00 kg/cm²
 - Status = ANOMALY
-- LED ON
-- Buzzer ON
+- LED = ON
+- Buzzer = ON
+- Anomaly Counter increases continuously while the pressure remains below the threshold.
 
 ## Example Data
 
-| Time (s) | Pressure (%) |
-|---|---|
-| 1 | 80 |
-| 2 | 79 |
-| 3 | 78 |
-| 4 | 35 |
-| 5 | 20 |
-
----
-
-# 3. Watchdog Recovery Simulation
-
-## Description
-
-Potentiometer is reduced near 0%.
-
-## Expected Behavior
-
-- Sensor abnormal condition detected
-- Watchdog recovery activated
-- Recovery status becomes ACTIVE
-
+| Time (s) | ADC Raw | Pressure (kg/cm²) | Status | LED | Buzzer | Anomaly Counter |
+|----------|--------:|------------------:|--------|-----|--------|----------------:|
+| 1 | 3470 | 5.77 | NORMAL | OFF | OFF | 0 |
+| 2 | 2889 | 4.73 | ANOMALY | ON | ON | 2 |
+| 3 | 2659 | 4.32 | ANOMALY | ON | ON | 12 |
+| 4 | 2456 | 3.95 | ANOMALY | ON | ON | 22 |
+| 5 | 2223 | 3.54 | ANOMALY | ON | ON | 32 |
+| 6 | 2078 | 3.28 | ANOMALY | ON | ON | 42 |
+| 7 | 2036 | 3.20 | ANOMALY | ON | ON | 52 |
+| 8 | 2079 | 3.28 | ANOMALY | ON | ON | 62 |
+| 9 | 2087 | 3.29 | ANOMALY | ON | ON | 72 |
+| 10 | 2088 | 3.29 | ANOMALY | ON | ON | 82 |
 ---
 
 # Project Structure
@@ -387,15 +433,35 @@ cargo run
 
 # 6. Monitor Serial Output
 
-The terminal displays:
+The serial monitor displays the following information in real time:
 
-- Time
-- ADC value
-- Pressure percentage
-- Status condition
-- Recovery state
+- Time (s)
+- ADC Raw Value
+- Calculated Pressure (kg/cm²)
+- Pressure Threshold (kg/cm²)
+- Anomaly Counter
+- System Status (NORMAL / ANOMALY)
+- LED Status (ON / OFF)
+- Buzzer Status (ON / OFF)
 
-in realtime.
+Example output:
+
+```text
+====================================
+   PRESSURE MONITORING SYSTEM
+        ESP32-S3 + RUST
+Threshold : 5.00 kg/cm2
+====================================
+
+Time         : 1 s
+ADC Raw      : 3767
+Pressure     : 6.30 kg/cm2
+Threshold    : 5.00 kg/cm2
+Anomaly Cnt  : 0
+Status       : NORMAL
+LED          : OFF
+Buzzer       : OFF
+```
 
 
 

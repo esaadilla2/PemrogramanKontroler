@@ -4,9 +4,12 @@
 
 # Project Report
 
-The complete project report can be accessed through the Google Drive link below:
+The complete project report & PPT can be accessed through the Google Drive link below:
+[📄_REPORT](https://drive.google.com/file/d/1H67X7qNdFu5MaYfPBCpyNHr_sHiq0Fw7/)
 
-[📄 REPORT](https://drive.google.com/file/d/1H67X7qNdFu5MaYfPBCpyNHr_sHiq0Fw7/)
+[📑 REVISED_REPORT](https://drive.google.com/file/d/1rsivgzsf5GSL6BsVzhmnbfy5t2P1h9J3/)
+
+[💻 PPT](https://canva.link/5qzsiky4l29eidn)
 
 # Project Overview
 

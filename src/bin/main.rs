@@ -15,6 +15,16 @@ use esp_hal::{
 
 esp_bootloader_esp_idf::esp_app_desc!();
 
+// =====================================
+// KONSTANTA SENSOR
+// =====================================
+
+const VREF: f32 = 3.3;
+const VS: f32 = 5.0;
+
+// Threshold pressure hasil kalibrasi
+const PRESSURE_THRESHOLD: f32 = 5.0;
+
 #[main]
 fn main() -> ! {
 
@@ -24,7 +34,7 @@ fn main() -> ! {
 
     let peripherals =
         esp_hal::init(
-            esp_hal::Config::default()
+            esp_hal::Config::default(),
         );
 
     let delay = Delay::new();
@@ -51,7 +61,6 @@ fn main() -> ! {
 
     // =====================================
     // ADC CONFIGURATION
-    // POTENTIOMETER -> GPIO4
     // =====================================
 
     let mut adc_config = AdcConfig::new();
@@ -62,13 +71,14 @@ fn main() -> ! {
             Attenuation::_11dB,
         );
 
-    let mut adc = Adc::new(
-        peripherals.ADC1,
-        adc_config,
-    );
+    let mut adc =
+        Adc::new(
+            peripherals.ADC1,
+            adc_config,
+        );
 
     // =====================================
-    // REALTIME TASK INTERVAL
+    // TASK INTERVAL
     // =====================================
 
     let sampling_interval =
@@ -77,11 +87,8 @@ fn main() -> ! {
     let display_interval =
         Duration::from_millis(1000);
 
-    let watchdog_interval =
-        Duration::from_millis(3000);
-
     // =====================================
-    // TASK TIMER
+    // TIMER
     // =====================================
 
     let mut previous_sample =
@@ -90,29 +97,27 @@ fn main() -> ! {
     let mut previous_display =
         Instant::now();
 
-    let mut previous_watchdog =
-        Instant::now();
-
     // =====================================
-    // SYSTEM VARIABLE
+    // VARIABLE
     // =====================================
 
-    let mut pressure_value: u16 = 0;
+    let mut pressure_raw: u16 = 0;
+    let mut pressure: f32 = 0.0;
 
-    let mut watchdog_counter: u32 = 0;
-
-    let mut recovery_mode = false;
+    // Counter jumlah anomaly berturut-turut
+    let mut anomaly_counter: u32 = 0;
 
     let mut time_sec: u32 = 0;
 
     // =====================================
-    // SYSTEM HEADER
+    // HEADER
     // =====================================
 
     println!();
     println!("====================================");
     println!("   PRESSURE MONITORING SYSTEM");
     println!("        ESP32-S3 + RUST");
+    println!("Threshold : {:.2} kg/cm2", PRESSURE_THRESHOLD);
     println!("====================================");
 
     loop {
@@ -120,129 +125,93 @@ fn main() -> ! {
         let now = Instant::now();
 
         // =====================================
-        // TASK 1:
-        // REALTIME ADC SAMPLING
+        // TASK 1 : ADC SAMPLING
         // =====================================
 
-        if now - previous_sample
-            >= sampling_interval
-        {
+        if now - previous_sample >= sampling_interval {
+
             previous_sample = now;
 
-            pressure_value =
+            pressure_raw =
                 block!(
                     adc.read_oneshot(
-                        &mut pressure_pin
+                        &mut pressure_pin,
                     )
                 )
                 .unwrap();
+
+            // ADC -> Tegangan
+            let vin =
+                (pressure_raw as f32 / 4095.0)
+                * VREF;
+
+            // Tegangan -> Pressure
+            pressure =
+                ((vin / VS) - 0.04)
+                / 0.09;
 
             // =====================================
             // ANOMALY DETECTION
             // =====================================
 
-            if pressure_value < 2000 {
-
-                led.set_high();
-
-                buzzer.set_high();
-
-            } else {
-
-                led.set_low();
-
-                buzzer.set_low();
-            }
-
-            // =====================================
-            // SOFTWARE WATCHDOG MONITOR
-            // =====================================
-
-            if pressure_value <= 300 {
-
-                watchdog_counter += 1;
-
-            } else {
-
-                watchdog_counter = 0;
-            }
-        }
-
-        // =====================================
-        // TASK 2:
-        // WATCHDOG RECOVERY
-        // =====================================
-
-        if now - previous_watchdog
-            >= watchdog_interval
-        {
-            previous_watchdog = now;
-
-            if watchdog_counter >= 3 {
-
-                recovery_mode = true;
-
-                println!();
-                println!("====================================");
-                println!("         WATCHDOG ALERT");
-                println!("   Sensor Failure Detected");
-                println!("   Recovery Mode Activated");
-                println!("====================================");
+            if pressure < PRESSURE_THRESHOLD {
 
                 led.set_high();
                 buzzer.set_high();
 
-                delay.delay_millis(1000);
+                anomaly_counter += 1;
+
+            } else {
 
                 led.set_low();
                 buzzer.set_low();
 
-                watchdog_counter = 0;
+                anomaly_counter = 0;
 
-            } else {
-
-                recovery_mode = false;
             }
+
         }
 
         // =====================================
-        // TASK 3:
-        // SERIAL MONITOR DISPLAY
+        // TASK 2 : SERIAL MONITOR
         // =====================================
 
-        if now - previous_display
-            >= display_interval
-        {
+        if now - previous_display >= display_interval {
+
             previous_display = now;
 
-            // realtime second counter
             time_sec += 1;
-
-            let pressure_percent =
-                (pressure_value as f32
-                    / 4095.0)
-                    * 100.0;
 
             println!();
 
             println!(
-                "Time      : {} s",
+                "Time         : {} s",
                 time_sec
             );
 
             println!(
-                "ADC Value : {}",
-                pressure_value
+                "ADC Raw      : {}",
+                pressure_raw
             );
 
             println!(
-                "Pressure  : {:.2} %",
-                pressure_percent
+                "Pressure     : {:.2} kg/cm2",
+                pressure
             );
 
             println!(
-                "Status    : {}",
-                if pressure_value < 2000 {
+                "Threshold    : {:.2} kg/cm2",
+                PRESSURE_THRESHOLD
+            );
+
+            println!(
+                "Anomaly Cnt  : {}",
+                anomaly_counter
+            );
+
+            println!(
+                "Status       : {}",
+                if pressure < PRESSURE_THRESHOLD {
                     "ANOMALY"
                 } else {
                     "NORMAL"
@@ -250,8 +219,8 @@ fn main() -> ! {
             );
 
             println!(
-                "LED       : {}",
-                if pressure_value < 2000 {
+                "LED          : {}",
+                if pressure < PRESSURE_THRESHOLD {
                     "ON"
                 } else {
                     "OFF"
@@ -259,29 +228,21 @@ fn main() -> ! {
             );
 
             println!(
-                "Buzzer    : {}",
-                if pressure_value < 2000 {
+                "Buzzer       : {}",
+                if pressure < PRESSURE_THRESHOLD {
                     "ON"
                 } else {
                     "OFF"
-                }
-            );
-
-            println!(
-                "Recovery  : {}",
-                if recovery_mode {
-                    "ACTIVE"
-                } else {
-                    "NORMAL"
                 }
             );
 
         }
 
         // =====================================
-        // SMALL LOOP DELAY
+        // LOOP DELAY
         // =====================================
 
         delay.delay_millis(10);
+
     }
 }

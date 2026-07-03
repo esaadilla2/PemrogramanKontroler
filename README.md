@@ -14,8 +14,8 @@ This project implements a realtime embedded pressure monitoring and anomaly dete
 
 The system continuously performs:
 
-- realtime ADC sampling
-- pressure monitoring
+- Realtime ADC sampling
+- Pressure monitoring
 - Pressure calculation
 - Pressure anomaly detection
 - Leak simulation using potentiometer
@@ -156,29 +156,29 @@ UART Monitoring
 
 The potentiometer is used as an analog input to simulate the output voltage of a pressure sensor. The ESP32-S3 reads the analog voltage through its 12-bit ADC, producing a digital value in the range of 0–4095.
 
-The ADC value is first converted into an analog voltage using the following equation:
+The ADC value is first converted into an analog voltage using:
 
-\[
-V_{in} = \frac{ADC}{4095} \times V_{REF}
-\]
-
-where:
-
-- **ADC** = 12-bit ADC reading (0–4095)
-- **4095** = Maximum value of a 12-bit ADC
-- **VREF** = ADC reference voltage (3.3 V)
-
-After obtaining the input voltage, the pressure value is calculated using the transfer function of the MPX5010 pressure sensor:
-
-\[
-P=\frac{\left(\frac{V_{in}}{V_S}\right)-0.04}{0.09}
-\]
+```text
+Vin = (ADC / 4095) × VREF
+```
 
 where:
 
-- **P** = Calculated pressure (kg/cm²)
-- **Vin** = Voltage obtained from the ADC conversion
-- **VS** = Sensor supply voltage (5 V)
+- ADC = 12-bit ADC reading (0–4095)
+- 4095 = Maximum value of a 12-bit ADC
+- VREF = ADC reference voltage (3.3 V)
+
+After obtaining the input voltage, the pressure is calculated using the MPX5010 transfer function:
+
+```text
+Pressure = ((Vin / VS) - 0.04) / 0.09
+```
+
+where:
+
+- Pressure = Calculated pressure (kg/cm²)
+- Vin = Voltage obtained from the ADC conversion
+- VS = Sensor supply voltage (5 V)
 
 The calculated pressure is then compared with a predefined threshold.
 

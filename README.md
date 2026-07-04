@@ -6,15 +6,13 @@
 
 The complete project report & PPT can be accessed through the Google Drive link below:
 
-[📄_REPORT](https://drive.google.com/file/d/1H67X7qNdFu5MaYfPBCpyNHr_sHiq0Fw7/)
-
-[📑 REVISED_REPORT](https://drive.google.com/file/d/1rsivgzsf5GSL6BsVzhmnbfy5t2P1h9J3/)
+[📑 REPORT](https://drive.google.com/file/d/1rsivgzsf5GSL6BsVzhmnbfy5t2P1h9J3/)
 
 [💻 PPT](https://canva.link/5qzsiky4l29eidn)
 
 ## Presentation
 
-The project was presented and demonstrated as part of the Embedded Programming course evaluation.
+The project was presented and demonstrated as part of the Programming Controller course evaluation.
 
 ![Project Presentation](images/presentation.png)
 
